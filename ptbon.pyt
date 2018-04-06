@@ -370,11 +370,15 @@ class PointBonitation(object):
             clc_feature = parameters[1].valueAsText
             out_feature = parameters[3].valueAsText
             
-            # this one doesn't work well with batch processing, as param[2] is given as plain
-            # string rather than list. i wonder if there's any flag indicating whether we're 
-            # in batch so conditional parsing could be done
-            # TO BE DONE LATER :)
-            corine_levels = [(val[0], val[1]) for val in parameters[2].values if val[2] != False]
+            levels = []
+            if isinstance(parameters[2], basestring):
+                for e in parameters[2].split(';'):
+                    arr = e.split()
+                    levels.append([arr[0], float(arr[1]), arr[2].lower() == 'true')
+            else:
+                levels = parameters[2].values
+
+            corine_levels = [(val[0], val[1]) for val in levels if val[2] != False]
                         
             ptbon(input_feature, clc_feature, corine_levels, out_feature)
             
