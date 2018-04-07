@@ -101,7 +101,6 @@ class ClcLayer:
     # calculate area of CLC within grid cell
     def calculate_area(self):
         arcpy.AddField_management(self.feature, self.area_field, 'DOUBLE')
-        arcpy.AssignDefaultToField_management(self.feature, self.area_field, '0')
 
         area_expression = '!SHAPE.AREA@SQUAREKILOMETERS!'
         arcpy.CalculateField_management(self.feature, self.area_field, area_expression, 'PYTHON_9.3')
@@ -110,9 +109,12 @@ class ClcLayer:
     # calculate % coverage (layer must be already joined with grid so we have cell area)
     def calculate_coverage(self):
         arcpy.AddField_management(self.joint_feature, self.coverage_field, 'DOUBLE')
-        arcpy.AssignDefaultToField_management(self.joint_feature, self.coverage_field, '0')
-        coverage_expression = '!{}!/!{}!'.format(self.area_field, 'area_cell')
-        arcpy.CalculateField_management(self.joint_feature, self.coverage_field, coverage_expression, 'PYTHON_9.3')
+        rows = arcpy.da.UpdateCursor(self.joint_feature, [self.coverage_field, self.area_field, 'area_cell'])
+        for row in rows:
+            row[1] = row[1] if row[1] != None else 0
+            row[0] = row[1] / row[2]
+            rows.updateRow(row)
+
         log('ClcLayer({})::calculate_coverage() done'.format(self.name))
 
     # join spatially with grid
@@ -131,24 +133,6 @@ class ClcLayer:
         # finally do a spatial join
         arcpy.SpatialJoin_analysis(grid_feature, self.feature, self.joint_feature, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mappings, match_option="CONTAINS")
         log('ClcLayer({})::join_spatially_with_grid() done'.format(self.name))
-
-    def __build_coverage_dict_codeblock(self, dictionary):
-        code = "def update(oid):\n"
-        code += "    dictionary = {\n"
-        for k, v in dictionary.items():
-            code += '        {0} : {1},\n'.format(k, v)
-        code += "    }\n"
-        code += "    return dictionary[oid]\n"
-        code += "\n"
-        return code
-
-    # get codeblock which will be used in updating original grid
-    def get_coverage_column_codeblock(self):
-        rows = arcpy.da.SearchCursor(self.joint_feature, ['TARGET_FID', self.coverage_field]) # we only need grid cell id and values
-        coverage_dict = {}
-        for row in rows:
-            coverage_dict[row[0]] = row[1] if row[1] is not None else 0   # list comprehension?
-        return self.__build_coverage_dict_codeblock(coverage_dict)
 
     def get_formula(self):
         return '({} * {})'.format(self.level.weight, self.level.name)
@@ -188,11 +172,7 @@ class TargetGrid:
 
     def copy_clc_coverage(self):
         for clc_lyr in self.clc_layers:
-            arcpy.AddField_management(self.feature, clc_lyr.coverage_field, 'DOUBLE')
-            arcpy.AssignDefaultToField_management(self.feature, clc_lyr.coverage_field, '0')
-
-            values_codeblock = clc_lyr.get_coverage_column_codeblock()
-            arcpy.CalculateField_management(self.feature, clc_lyr.coverage_field, 'update(!OBJECTID!)', 'PYTHON_9.3', values_codeblock)
+            arcpy.JoinField_management(self.feature, 'OBJECTID', clc_lyr.joint_feature, 'TARGET_FID', clc_lyr.coverage_field)
         log('TargetGrid::copy_clc_coverage() done')
 
     def __build_ptbon_formula(self):
@@ -219,11 +199,12 @@ class TargetGrid:
 
     def assign_points(self):
         arcpy.AddField_management(self.feature, self.points_field, 'INTEGER')
-        arcpy.AssignDefaultToField_management(self.feature, self.points_field, '0')
 
+        # this is a way too hacky and should be replaced with update cursor
         ptbon_expr = self.__build_ptbon_expression()
         ptbon_codeblock = self.__build_ptbon_codeblock()
         arcpy.CalculateField_management(self.feature, self.points_field, ptbon_expr, 'PYTHON_9.3', ptbon_codeblock)
+
         log('TargetGrid::assign_points() done')
         
     def copy_features_to_target(self, tgt_feature):
