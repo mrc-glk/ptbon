@@ -86,6 +86,7 @@ class ClcLayer:
         self.joint_feature = os.path.join(gdb, 'joint' + self.name)
         self.area_field = 'area_' + self.name
         self.coverage_field = 'coverage_' + self.name
+        self.points_field = 'points_' + self.name
         self.weight = weight
         self.clc_version_field = clc_version_field
 
@@ -135,9 +136,14 @@ class ClcLayer:
         arcpy.SpatialJoin_analysis(grid_feature, self.feature, self.joint_feature, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mappings, match_option="CONTAINS")
         log('ClcLayer({})::join_spatially_with_grid() done'.format(self.name))
 
-    # TODO points should be calculated per layer and then passed to target grid instead of passing formula and/or python codeblock
-    def get_formula(self):
-        return '({} * {})'.format(self.level.weight, self.level.name)
+    # assign points
+    def assign_points(self):
+        arcpy.AddField_management(self.joint_feature, self.points_field, 'INTEGER')
+        rows = arcpy.da.UpdateCursor(self.joint_feature, [self.points_field, self.coverage_field])
+        for row in rows:
+             row[0] = int(row[1] * self.coverage_field)
+             rows.updateRow(row)
+        log('ClcLayer({})::assign_points() done'.format(self.name))
 
 
 class TargetGrid:
@@ -177,37 +183,23 @@ class TargetGrid:
             arcpy.JoinField_management(self.feature, 'OBJECTID', clc_lyr.joint_feature, 'TARGET_FID', clc_lyr.coverage_field)
         log('TargetGrid::copy_clc_coverage() done')
 
-    def __build_ptbon_formula(self):
-        form = ''
+    def copy_clc_points(self):
         for clc_lyr in self.clc_layers:
-            form += clc_lyr.get_formula() + ' + '
-        form += '0\n'
-        return form
+            arcpy.JoinField_management(self.feature, 'OBJECTID', clc_lyr.joint_feature, 'TARGET_FID', clc_lyr.points_field)
+        log('TargetGrid::copy_clc_points() done')
 
-    def __build_ptbon_expression(self):
-        expr = 'calc_ptbon('
-        for clc_lyr in self.clc_layers:
-            expr += '!{}!, '.format(clc_lyr.coverage_field)
-        expr += 'None)\n'
-        return expr
-
-    def __build_ptbon_codeblock(self):
-        codeblock = 'def calc_ptbon('
-        for clc_lyr in self.clc_layers:
-            codeblock += '{}, '.format(clc_lyr.level.name)
-        codeblock += 'empty=None):\n'
-        codeblock += '    return int({})\n'.format(self.__build_ptbon_formula())
-        return codeblock
-
-    def assign_points(self):
+    def sum_points(self):
         arcpy.AddField_management(self.feature, self.points_field, 'INTEGER')
 
-        # this is a way too hacky and should be replaced with update cursor
-        ptbon_expr = self.__build_ptbon_expression()
-        ptbon_codeblock = self.__build_ptbon_codeblock()
-        arcpy.CalculateField_management(self.feature, self.points_field, ptbon_expr, 'PYTHON_9.3', ptbon_codeblock)
+        clc_lyr_pts = [clc_lyr.points_field for clc_lyr in self.clc_layers]
 
-        log('TargetGrid::assign_points() done')
+        rows = arcpy.da.UpdateCursor(self.feature, [self.points_field, clc_lyr_pts])
+        for row in rows:
+             pts_sum = sum([lyr_pts for lyr_pts in rows[1:]])
+             row[0] = pts_sum
+             rows.updateRow(row)
+
+        log('TargetGrid::sum_points() done')
         
     def copy_features_to_target(self, tgt_feature):
         arcpy.CopyFeatures_management(self.feature, tgt_feature)
@@ -255,11 +247,12 @@ def ptbon(input_region, input_clc, corine_layers, out_feature):
         clc_layer.calculate_area()
         clc_layer.join_spatially_with_grid(tgt_grid.feature)
         clc_layer.calculate_coverage()
+        clc_layer.assign_points()
 
         tgt_grid.add_clc_layer(clc_layer)
 
-    tgt_grid.copy_clc_coverage()
-    tgt_grid.assign_points()
+    tgt_grid.copy_clc_points()
+    tgt_grid.sum_points()
     tgt_grid.copy_features_to_target(out_feature)
 
     
