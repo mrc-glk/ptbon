@@ -61,17 +61,17 @@ class ClcLevel:
 
 clc_levels = {
     'UrbanFabric' : ClcLevel('UrbanFabric', ['111', '112'], -20, True),
-    'IndustrialCommercial' : ClcLevel('IndustrialCommercial', ['121'], -30, False),
+    'IndustrialCommercial' : ClcLevel('IndustrialCommercial', ['121', '122', '123', '124'], -30, True),
     'ArableLand' : ClcLevel('ArableLand', ['211', '212', '213'], 15, True),
     'PermanentCrops' : ClcLevel('PermanentCrops', ['221', '222', '223'], 10, False),
-    'Pastures' : ClcLevel('Pastures', ['231'], 25, True),
+    'Pastures' : ClcLevel('Pastures', ['231'], 20, True),
     'HeterogeneousAgricultural' : ClcLevel('HeterogeneousAgricultural', ['241', '242', '243', '244'], 15, False),
     'Forests': ClcLevel('Forests', ['311', '312', '313'], 25, True),
     'ScrubsHerbaVege' : ClcLevel('ScrubsHerbaVege', ['321', '322', '323', '324'], 20, False),
     'OpenSpacesNoVege' : ClcLevel('OpenSpacesNoVege', ['331', '332', '333', '334', '335'], 10, False),
     'InlandWetlands' : ClcLevel('InlandWetlands', ['411', '412'], 20, False),
     'MaritimeWetlands' : ClcLevel('MaritimeWetlands', ['421', '422', '423'], 20, False),
-    'InlandWaters' : ClcLevel('InlandWaters', ['511', '512'], 25, True),
+    'InlandWaters' : ClcLevel('InlandWaters', ['511', '512'], 15, True),
     'MaritimeWaters' : ClcLevel('MaritimeWaters', ['512', '522', '523'], 15, False),
 }
 
