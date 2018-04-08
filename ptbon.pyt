@@ -73,6 +73,7 @@ clc_levels = {
     'MaritimeWetlands' : ClcLevel('MaritimeWetlands', ['421', '422', '423'], 20, False),
     'InlandWaters' : ClcLevel('InlandWaters', ['511', '512'], 15, True),
     'MaritimeWaters' : ClcLevel('MaritimeWaters', ['512', '522', '523'], 15, False),
+    # TODO add more CLC levels
 }
 
     
@@ -134,6 +135,7 @@ class ClcLayer:
         arcpy.SpatialJoin_analysis(grid_feature, self.feature, self.joint_feature, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mappings, match_option="CONTAINS")
         log('ClcLayer({})::join_spatially_with_grid() done'.format(self.name))
 
+    # TODO points should be calculated per layer and then passed to target grid instead of passing formula and/or python codeblock
     def get_formula(self):
         return '({} * {})'.format(self.level.weight, self.level.name)
 
