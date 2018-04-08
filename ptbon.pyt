@@ -141,7 +141,7 @@ class ClcLayer:
         arcpy.AddField_management(self.joint_feature, self.points_field, 'INTEGER')
         rows = arcpy.da.UpdateCursor(self.joint_feature, [self.points_field, self.coverage_field])
         for row in rows:
-             row[0] = int(row[1] * self.coverage_field)
+             row[0] = row[1] * self.weight
              rows.updateRow(row)
         log('ClcLayer({})::assign_points() done'.format(self.name))
 
@@ -195,8 +195,7 @@ class TargetGrid:
 
         rows = arcpy.da.UpdateCursor(self.feature, [self.points_field, clc_lyr_pts])
         for row in rows:
-             pts_sum = sum([lyr_pts for lyr_pts in rows[1:]])
-             row[0] = pts_sum
+             rows[0] = sum([lyr_pts for lyr_pts in rows[1:]])
              rows.updateRow(row)
 
         log('TargetGrid::sum_points() done')
